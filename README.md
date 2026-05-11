@@ -1,75 +1,331 @@
-## Star History
+# pgcheck
 
-[![Star History Chart](https://api.star-history.com/svg?repos=xiongcccc/pgcheck&type=Date)](https://star-history.com/#xiongcccc/pgcheck&Date)
+English | [中文](#中文)
 
-## Introduce
+`pgcheck` is a lightweight PostgreSQL health-check CLI for DBAs, SREs, and database engineers. It collects operational signals from PostgreSQL system catalogs and statistics views, including locks, wait events, replication, vacuum, transaction ID age, relation bloat, index health, WAL archiving, partitions, TOAST tables, and object ownership.
 
-pgcheck is a one-click tool to get the running status of PostgreSQL, including stream replication/lock/wait events/partition/index/relation,etc., which makes the operation and maintenance more efficient.
+The project started as a Bash-based one-click inspection script. It is now being refactored into a structured Go project with embedded SQL assets, explicit command registration, server-version detection, and a cleaner compatibility model.
 
-The script currently being refactored with golang, so stay tuned!
+## Highlights
 
-### Note
+- Simple single-binary CLI written in Go.
+- Uses PostgreSQL's standard `psql` connection behavior and environment variables.
+- Embeds SQL checks into the binary with Go `embed`.
+- Detects PostgreSQL server version instead of relying on client version.
+- Keeps each check as a registered command, making the project easier to extend and test.
+- Preserves the original SQL assets under `SQL/` for review and reuse.
 
-The current supported versions include 11, 12, 13, 14, and 15. Other versions may be a little incompatible, and some of them report errors, but most of them can also be used. Currently supported platform is x86.
+## Compatibility
 
-## Usage
+The original tool was tested up to PostgreSQL 15. The Go refactor keeps PostgreSQL 11-15 as the primary compatibility target and adds version-aware behavior for newer PostgreSQL releases where possible.
 
-~~~shell
-Description: The utility is used to collect specified information
-Current Version: 1.0.4
-Usage:
- ./pgcheck relation database schema         : list information about tables and indexes in the specified schema
- ./pgcheck relconstraint database relname   : list all constraint corresponding to the specified table
- ./pgcheck alltoast database schema         : list all toasts and their corresponding tables
- ./pgcheck reltoast database relname        : list the toast information of the specified table
- ./pgcheck dbstatus                         : list all database status and statistics
- ./pgcheck index_bloat database             : index bloat information (estimated value)
- ./pgcheck index_duplicate database         : index duplicate information
- ./pgcheck index_low database               : index low efficiency information
- ./pgcheck index_state database             : index detail information
- ./pgcheck lock database                    : lock wait queue and lock wait state
- ./pgcheck checkpoint                       : background and checkpointer state
- ./pgcheck freeze database                  : database transaction id consuming state and detail
- ./pgcheck replication                      : streaming replication (physical) state
- ./pgcheck connections database             : database connections and current query
- ./pgcheck long_transaction database        : long transaction detail
- ./pgcheck relation_bloat database          : relation bloat information (estimated value)
- ./pgcheck vacuum_state database            : current vacuum progress information
- ./pgcheck vacuum_need database             : show tables that need vacuum
- ./pgcheck index_create database            : index create progress information
- ./pgcheck wal_archive                      : wal archive progress information
- ./pgcheck wal_generate wal_path            : wal generate speed (you should provide extra wal directory)
- ./pgcheck wait_event database              : wait event and wait event type
- ./pgcheck partition database               : native and inherit partition info (estimated value)
- ./pgcheck object database user             : get the objects owned by the user in the specified database
- ./pgcheck --help or -h                     : print this help information
+PostgreSQL 17+ changed some statistics views, including checkpoint and VACUUM progress views. `pgcheck` now ships version-specific SQL for those checks. Most read-only checks have been smoke-tested against a PostgreSQL 17+ public test instance; `wal_generate` still requires a valid server-side `pg_wal` path and should be verified per deployment.
 
- Author: xiongcc@PostgreSQL学徒, github: https://github.com/xiongcccc.
- If you have any feedback or suggestions, feel free to contact with me.
- Email: xiongcc_1994@126.com/xiongcc_1994@outlook.com. Wechat: _xiongcc
-~~~
-Currently supported features include：
+## Requirements
 
-- View the table status information in the specified schema
-- View the information of all toast tables in the specified schema and the toast information of a specified table
-- View the overall status information of the database, which will be different in different versions (please specify the exact version of the psql environment variable, because the system views of different versions will be different, and the judgment is made in the code, otherwise an error may be reported)
-- View index bloat ratio/redundant index/inefficient index/index overall information
-- View index information
-- View lock state and lock queue 
-- View checkpoint and background writer process status
-- View age and transaction id consuming detail at database level
-- View streaming replication status
-- View the number of connections and queries currently being allowed
-- View long transactions
-- View table bloat, table bloat depends on statistical information, so in order to be more accurate, it is best to do an analysis before doing it, this query will take a little time
-- View tables that need to execute vacuum and retrieves the oldest value for each of the vacuum operation blockers 
-- Check the index creation progress, only supported in versions after 12, and the previous version will prompt that the view does not exist and exit
-- View WAL archive status
-- View WAL generation speed
-- View wait event 
-- View partition table information, including native partitions and inherited partitions
-- View objects owned by a user, and member relationship
+- Go 1.23+ for building from source.
+- PostgreSQL client tools, especially `psql`, available in `PATH`.
+- A PostgreSQL role with enough privileges to read the relevant catalog and statistics views.
 
-The default port used is 5432. If there are multiple instances on the server, you can specify environment variables before use, such as export PGPORT=5433。
+`pgcheck` follows libpq/psql connection settings:
 
-If you have any feedback or suggestions, feel free to contact with me.
+```bash
+export PGHOST=127.0.0.1
+export PGPORT=5432
+export PGUSER=postgres
+export PGPASSWORD=secret
+```
+
+If `psql` is not in `PATH`, set `PGCHECK_PSQL`:
+
+```bash
+export PGCHECK_PSQL=/usr/local/pgsql/bin/psql
+```
+
+`pgcheck` also supports a native Go driver backend, which is useful on hosts without `psql`:
+
+```bash
+export PGCHECK_BACKEND=native
+```
+
+## Build
+
+```bash
+go build -o bin/pgcheck .
+```
+
+or:
+
+```bash
+make build
+```
+
+Show help:
+
+```bash
+bin/pgcheck help
+```
+
+Show version:
+
+```bash
+bin/pgcheck version
+```
+
+## Commands
+
+```text
+pgcheck relation <database> <schema>         List table and index size in a schema
+pgcheck relconstraint <database> <relation>  List constraints and multi-column indexes for a relation
+pgcheck alltoast <database> <schema>         List TOAST tables in a schema
+pgcheck reltoast <database> <relation>       Show TOAST-related columns for a relation
+pgcheck dbstatus                             Show database-level statistics
+pgcheck index_bloat <database>               Estimate btree index bloat
+pgcheck index_duplicate <database>           Find duplicate indexes
+pgcheck index_low <database>                 Find low-efficiency indexes
+pgcheck index_state <database>               Show index details and invalid indexes
+pgcheck lock <database>                      Show lock waits and blocking queue
+pgcheck checkpoint                           Show background writer and checkpointer statistics
+pgcheck freeze <database>                    Show transaction ID consumption and freeze risk
+pgcheck replication                          Show physical streaming replication status
+pgcheck connections <database>               Show connection summary and active queries
+pgcheck long_transaction <database>          Show long-running transactions
+pgcheck relation_bloat <database>            Estimate table bloat and vacuum blockers
+pgcheck vacuum_state <database>              Show running VACUUM progress
+pgcheck vacuum_need <database>               Show tables likely to need vacuum
+pgcheck index_create <database>              Show CREATE INDEX progress
+pgcheck wal_archive                          Show WAL archiver statistics
+pgcheck wal_generate <wal_path>              Show WAL generation speed by scanning pg_wal
+pgcheck wait_event <database>                Show wait events and wait event types
+pgcheck partition <database>                 Show partition information
+pgcheck object <database> <user>             Show objects owned by a user and role membership
+```
+
+## Examples
+
+```bash
+bin/pgcheck dbstatus
+bin/pgcheck connections postgres
+bin/pgcheck lock postgres
+bin/pgcheck freeze postgres
+bin/pgcheck relation postgres public
+bin/pgcheck index_bloat postgres
+bin/pgcheck wal_generate /var/lib/postgresql/data/pg_wal
+```
+
+## Project Layout
+
+```text
+.
+├── main.go                 Go entrypoint and SQL embedding
+├── internal/
+│   ├── app/                CLI commands, version-aware checks, command execution flow
+│   ├── pgexec/             psql runner and PostgreSQL server version detection
+│   └── queries/            embedded SQL loader and small templating helpers
+├── SQL/                    original SQL check assets
+├── pgcheck.sh              legacy Bash implementation
+└── README.md
+```
+
+## Design Notes
+
+The current Go implementation intentionally keeps `psql` as the execution backend. This avoids introducing driver dependencies during the first structural refactor and preserves standard PostgreSQL connection behavior, including `.pgpass`, service files, SSL options, and existing environment variables.
+
+The project also includes an optional native Go backend based on `database/sql` and `github.com/lib/pq`. Use `PGCHECK_BACKEND=native` when `psql` is unavailable or when you prefer not to shell out.
+
+## Development
+
+Run tests:
+
+```bash
+go test ./...
+```
+
+Format code:
+
+```bash
+gofmt -w main.go internal/**/*.go
+```
+
+Build:
+
+```bash
+go build -o bin/pgcheck .
+```
+
+## Roadmap
+
+- Add automated PostgreSQL 11-18 compatibility tests with containers.
+- Add structured output formats such as JSON and Markdown.
+- Add severity classification for health-check results.
+- Add native Go database driver execution mode.
+- Add release artifacts for Linux/macOS on amd64 and arm64.
+
+## License
+
+Apache License 2.0. See [LICENSE](LICENSE).
+
+## 中文
+
+`pgcheck` 是一款轻量级 PostgreSQL 巡检 CLI，面向 DBA、SRE 和数据库工程师。它通过 PostgreSQL 系统表、系统视图和统计视图采集运行状态，覆盖锁等待、等待事件、复制、VACUUM、事务 ID 年龄、表膨胀、索引健康、WAL 归档、分区表、TOAST 表和对象归属等常见运维场景。
+
+这个项目最早是一个 Bash 编写的一键巡检脚本。当前版本正在重构为结构化的 Go 项目：SQL 资源会被嵌入二进制，命令通过注册表管理，版本判断基于 PostgreSQL 服务端版本，并提供更清晰的兼容策略。
+
+## 亮点
+
+- 使用 Go 编写，构建后是一个简单的单文件 CLI。
+- 复用 PostgreSQL 标准 `psql` 连接行为和环境变量。
+- 使用 Go `embed` 将 SQL 巡检资源嵌入二进制。
+- 检测 PostgreSQL 服务端版本，而不是依赖本地客户端版本。
+- 每个巡检项都是独立注册的命令，后续扩展和测试更容易。
+- 保留原始 `SQL/` 目录，方便审阅、复用和继续沉淀 SQL 资产。
+
+## 兼容性
+
+原始工具主要测试到 PostgreSQL 15。Go 重构版本继续将 PostgreSQL 11-15 作为主要兼容目标，同时尽量为更高版本保留版本感知能力。
+
+PostgreSQL 17+ 对部分统计视图做了调整，例如 checkpoint 和 VACUUM progress 相关视图。`pgcheck` 现在已经为这些检查提供了版本专用 SQL。大部分只读巡检命令已经在 PostgreSQL 17+ 公网测试实例上完成冒烟验证；`wal_generate` 仍然依赖服务端 `pg_wal` 物理路径，需要按具体部署单独验证。
+
+## 环境要求
+
+- 从源码构建需要 Go 1.23+。
+- 本机需要安装 PostgreSQL 客户端工具，并确保 `psql` 在 `PATH` 中。
+- 巡检用户需要有读取相关系统视图和统计视图的权限。
+
+连接方式遵循 libpq/psql 标准环境变量：
+
+```bash
+export PGHOST=127.0.0.1
+export PGPORT=5432
+export PGUSER=postgres
+export PGPASSWORD=secret
+```
+
+如果 `psql` 不在 `PATH` 中，可以指定 `PGCHECK_PSQL`：
+
+```bash
+export PGCHECK_PSQL=/usr/local/pgsql/bin/psql
+```
+
+`pgcheck` 也支持原生 Go driver 后端，适合没有安装 `psql` 的环境：
+
+```bash
+export PGCHECK_BACKEND=native
+```
+
+## 构建
+
+```bash
+go build -o bin/pgcheck .
+```
+
+也可以使用：
+
+```bash
+make build
+```
+
+查看帮助：
+
+```bash
+bin/pgcheck help
+```
+
+查看版本：
+
+```bash
+bin/pgcheck version
+```
+
+## 命令列表
+
+```text
+pgcheck relation <database> <schema>         查看指定 schema 下表和索引大小
+pgcheck relconstraint <database> <relation>  查看指定表的约束和多列索引
+pgcheck alltoast <database> <schema>         查看指定 schema 下的 TOAST 表
+pgcheck reltoast <database> <relation>       查看指定表的 TOAST 相关列和 TOAST 表信息
+pgcheck dbstatus                             查看数据库整体状态
+pgcheck index_bloat <database>               估算 btree 索引膨胀
+pgcheck index_duplicate <database>           查找重复索引
+pgcheck index_low <database>                 查找低效索引
+pgcheck index_state <database>               查看索引详情和异常索引
+pgcheck lock <database>                      查看锁等待和阻塞队列
+pgcheck checkpoint                           查看后台写进程和检查点统计
+pgcheck freeze <database>                    查看事务 ID 消耗和 freeze 风险
+pgcheck replication                          查看物理流复制状态
+pgcheck connections <database>               查看连接汇总和当前查询
+pgcheck long_transaction <database>          查看长事务
+pgcheck relation_bloat <database>            估算表膨胀并查看 VACUUM 阻塞信息
+pgcheck vacuum_state <database>              查看正在运行的 VACUUM 进度
+pgcheck vacuum_need <database>               查看可能需要 VACUUM 的表
+pgcheck index_create <database>              查看 CREATE INDEX 进度
+pgcheck wal_archive                          查看 WAL 归档状态
+pgcheck wal_generate <wal_path>              基于 pg_wal 目录估算 WAL 生成速度
+pgcheck wait_event <database>                查看等待事件和等待类型
+pgcheck partition <database>                 查看分区表信息
+pgcheck object <database> <user>             查看用户拥有的对象和角色成员关系
+```
+
+## 示例
+
+```bash
+bin/pgcheck dbstatus
+bin/pgcheck connections postgres
+bin/pgcheck lock postgres
+bin/pgcheck freeze postgres
+bin/pgcheck relation postgres public
+bin/pgcheck index_bloat postgres
+bin/pgcheck wal_generate /var/lib/postgresql/data/pg_wal
+```
+
+## 项目结构
+
+```text
+.
+├── main.go                 Go 入口和 SQL 嵌入
+├── internal/
+│   ├── app/                CLI 命令、版本兼容逻辑和执行流程
+│   ├── pgexec/             psql 执行器和服务端版本检测
+│   └── queries/            嵌入式 SQL 加载和轻量模板处理
+├── SQL/                    原始 SQL 巡检资产
+├── pgcheck.sh              旧版 Bash 实现
+└── README.md
+```
+
+## 设计说明
+
+当前 Go 版本刻意保留 `psql` 作为 SQL 执行后端。这样第一阶段重构不需要引入外部驱动依赖，也能完整继承 `.pgpass`、service file、SSL 参数和环境变量等 PostgreSQL 标准连接能力。
+
+项目现在也包含基于 `database/sql` 和 `github.com/lib/pq` 的原生 Go 后端。没有安装 `psql`，或者不希望通过 shell 调用外部命令时，可以使用 `PGCHECK_BACKEND=native`。
+
+## 开发
+
+运行测试：
+
+```bash
+go test ./...
+```
+
+格式化：
+
+```bash
+gofmt -w main.go internal/**/*.go
+```
+
+构建：
+
+```bash
+go build -o bin/pgcheck .
+```
+
+## 后续计划
+
+- 使用容器补齐 PostgreSQL 11-18 的自动化兼容测试。
+- 增加 JSON、Markdown 等结构化输出格式。
+- 为巡检结果增加风险等级和诊断建议。
+- 增加原生 Go database driver 执行模式。
+- 发布 Linux/macOS amd64/arm64 构建产物。
+
+## License
+
+Apache License 2.0. See [LICENSE](LICENSE).
