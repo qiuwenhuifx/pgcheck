@@ -1,0 +1,22 @@
+{
+  "backend": "psql",
+  "connection": {
+    "host": "127.0.0.1",
+    "port": "5432",
+    "user": "postgres",
+    "password": "",
+    "database": "postgres",
+    "sslmode": "disable"
+  },
+  "psql": {
+    "path": "psql",
+    "quiet": true,
+    "tuples_only": false,
+    "no_align": false,
+    "no_psqlrc": true,
+    "extra_args": []
+  },
+  "output": {
+    "expanded": "auto"
+  }
+}

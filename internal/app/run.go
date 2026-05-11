@@ -63,7 +63,7 @@ func (a *App) runStep(ctx context.Context, inv invocation, step queryStep) error
 	if step.Header != "" {
 		fmt.Println(step.Header)
 	}
-	opts := pgexec.Options{Database: inv.DB, Expanded: step.Expanded}
+	opts := pgexec.Options{Database: inv.DB, Expanded: a.displayExpanded(step.Expanded)}
 	repeat := step.Repeat
 	if repeat == 0 {
 		repeat = 1
@@ -99,7 +99,7 @@ func (a *App) stepSQL(step queryStep) (string, error) {
 
 func (a *App) hasResultRows(ctx context.Context, opts pgexec.Options, query string) (bool, error) {
 	wrapped := "SELECT EXISTS (" + strings.TrimRight(query, " \t\r\n;") + ")"
-	out, err := a.runner.QueryScalar(ctx, pgexec.Options{Database: opts.Database, TuplesOnly: true}, wrapped)
+	out, err := a.runner.QueryScalar(ctx, pgexec.Options{Database: opts.Database, TuplesOnly: true, NoAlign: true}, wrapped)
 	if err != nil {
 		return false, err
 	}
@@ -125,12 +125,12 @@ func runReplication(ctx context.Context, a *App, inv invocation) error {
 	if err != nil {
 		return err
 	}
-	return a.runner.Exec(ctx, pgexec.Options{}, query)
+	return a.runner.Exec(ctx, pgexec.Options{Expanded: a.displayExpanded(false)}, query)
 }
 
 func runDBStatus(ctx context.Context, a *App, inv invocation) error {
 	query := databaseStatusSQL(inv.Version.Major)
-	return a.runner.Exec(ctx, pgexec.Options{Expanded: true}, query)
+	return a.runner.Exec(ctx, pgexec.Options{Expanded: a.displayExpanded(true)}, query)
 }
 
 func runCheckpoint(ctx context.Context, a *App, inv invocation) error {
@@ -142,7 +142,7 @@ func runCheckpoint(ctx context.Context, a *App, inv invocation) error {
 	if err != nil {
 		return err
 	}
-	if err := a.runner.Exec(ctx, pgexec.Options{Expanded: true}, query); err != nil {
+	if err := a.runner.Exec(ctx, pgexec.Options{Expanded: a.displayExpanded(true)}, query); err != nil {
 		return err
 	}
 	printNotes(checkpointNotes)
@@ -163,6 +163,17 @@ func runVacuumState(ctx context.Context, a *App, inv invocation) error {
 		Notes:        vacuumStateNotes,
 	}
 	return a.runStep(ctx, inv, step)
+}
+
+func (a *App) displayExpanded(defaultExpanded bool) bool {
+	switch a.runner.Config.Output.Expanded {
+	case "expanded":
+		return true
+	case "table":
+		return false
+	default:
+		return defaultExpanded
+	}
 }
 
 func databaseStatusSQL(major int) string {

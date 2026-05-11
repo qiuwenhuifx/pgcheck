@@ -24,10 +24,47 @@ PostgreSQL 17+ changed some statistics views, including checkpoint and VACUUM pr
 ## Requirements
 
 - Go 1.23+ for building from source.
-- PostgreSQL client tools, especially `psql`, available in `PATH`.
+- PostgreSQL client tools, especially `psql`, available in `PATH` when using the default `psql` backend.
 - A PostgreSQL role with enough privileges to read the relevant catalog and statistics views.
 
-`pgcheck` follows libpq/psql connection settings:
+`pgcheck` can read connection and display settings from a JSON config file, command-line options, or libpq-compatible environment variables. Command-line options have the highest priority.
+
+Use a config file when you do not want to export environment variables:
+
+```bash
+cp pgcheck.example.json pgcheck.json
+bin/pgcheck --config pgcheck.json dbstatus
+bin/pgcheck --config pgcheck.json --display expanded dbstatus
+```
+
+Config shape:
+
+```json
+{
+  "backend": "psql",
+  "connection": {
+    "host": "127.0.0.1",
+    "port": "5432",
+    "user": "postgres",
+    "password": "",
+    "database": "postgres",
+    "sslmode": "disable"
+  },
+  "psql": {
+    "path": "psql",
+    "quiet": true,
+    "tuples_only": false,
+    "no_align": false,
+    "no_psqlrc": true,
+    "extra_args": []
+  },
+  "output": {
+    "expanded": "auto"
+  }
+}
+```
+
+You can also use environment variables:
 
 ```bash
 export PGHOST=127.0.0.1
@@ -36,16 +73,25 @@ export PGUSER=postgres
 export PGPASSWORD=secret
 ```
 
-If `psql` is not in `PATH`, set `PGCHECK_PSQL`:
+If `psql` is not in `PATH`, set it in the config file or pass `--psql`:
 
 ```bash
-export PGCHECK_PSQL=/usr/local/pgsql/bin/psql
+bin/pgcheck --psql /usr/local/pgsql/bin/psql dbstatus
 ```
 
 `pgcheck` also supports a native Go driver backend, which is useful on hosts without `psql`:
 
 ```bash
-export PGCHECK_BACKEND=native
+bin/pgcheck --backend native --host 127.0.0.1 --port 5432 --user postgres --password secret dbstatus
+```
+
+Common psql-style display options are configurable:
+
+```bash
+bin/pgcheck --display expanded dbstatus
+bin/pgcheck --display table dbstatus
+bin/pgcheck --tuples-only --no-align connections postgres
+bin/pgcheck --psql-arg --single-transaction relation postgres public
 ```
 
 ## Build
@@ -105,6 +151,8 @@ pgcheck object <database> <user>             Show objects owned by a user and ro
 
 ```bash
 bin/pgcheck dbstatus
+bin/pgcheck --config pgcheck.json dbstatus
+bin/pgcheck --backend native --host 127.0.0.1 --user postgres dbstatus
 bin/pgcheck connections postgres
 bin/pgcheck lock postgres
 bin/pgcheck freeze postgres
@@ -123,15 +171,16 @@ bin/pgcheck wal_generate /var/lib/postgresql/data/pg_wal
 │   ├── pgexec/             psql runner and PostgreSQL server version detection
 │   └── queries/            embedded SQL loader and small templating helpers
 ├── SQL/                    original SQL check assets
+├── pgcheck.example.json    example configuration file
 ├── pgcheck.sh              legacy Bash implementation
 └── README.md
 ```
 
 ## Design Notes
 
-The current Go implementation intentionally keeps `psql` as the execution backend. This avoids introducing driver dependencies during the first structural refactor and preserves standard PostgreSQL connection behavior, including `.pgpass`, service files, SSL options, and existing environment variables.
+The current Go implementation keeps `psql` as the default execution backend. This preserves standard PostgreSQL behavior, including `.pgpass`, service files, SSL options, psql formatting, and existing environment variables.
 
-The project also includes an optional native Go backend based on `database/sql` and `github.com/lib/pq`. Use `PGCHECK_BACKEND=native` when `psql` is unavailable or when you prefer not to shell out.
+The project also includes an optional native Go backend based on `database/sql` and `github.com/lib/pq`. Use `--backend native` when `psql` is unavailable or when you prefer not to shell out.
 
 ## Development
 
@@ -189,10 +238,47 @@ PostgreSQL 17+ 对部分统计视图做了调整，例如 checkpoint 和 VACUUM 
 ## 环境要求
 
 - 从源码构建需要 Go 1.23+。
-- 本机需要安装 PostgreSQL 客户端工具，并确保 `psql` 在 `PATH` 中。
+- 使用默认 `psql` 后端时，本机需要安装 PostgreSQL 客户端工具，并确保 `psql` 在 `PATH` 中。
 - 巡检用户需要有读取相关系统视图和统计视图的权限。
 
-连接方式遵循 libpq/psql 标准环境变量：
+`pgcheck` 支持从 JSON 配置文件、命令行参数或 libpq 兼容环境变量读取连接和展示设置。命令行参数优先级最高。
+
+如果不想 export 一堆环境变量，可以使用配置文件：
+
+```bash
+cp pgcheck.example.json pgcheck.json
+bin/pgcheck --config pgcheck.json dbstatus
+bin/pgcheck --config pgcheck.json --display expanded dbstatus
+```
+
+配置结构：
+
+```json
+{
+  "backend": "psql",
+  "connection": {
+    "host": "127.0.0.1",
+    "port": "5432",
+    "user": "postgres",
+    "password": "",
+    "database": "postgres",
+    "sslmode": "disable"
+  },
+  "psql": {
+    "path": "psql",
+    "quiet": true,
+    "tuples_only": false,
+    "no_align": false,
+    "no_psqlrc": true,
+    "extra_args": []
+  },
+  "output": {
+    "expanded": "auto"
+  }
+}
+```
+
+也可以继续使用环境变量：
 
 ```bash
 export PGHOST=127.0.0.1
@@ -201,16 +287,25 @@ export PGUSER=postgres
 export PGPASSWORD=secret
 ```
 
-如果 `psql` 不在 `PATH` 中，可以指定 `PGCHECK_PSQL`：
+如果 `psql` 不在 `PATH` 中，可以在配置文件里设置，或通过 `--psql` 指定：
 
 ```bash
-export PGCHECK_PSQL=/usr/local/pgsql/bin/psql
+bin/pgcheck --psql /usr/local/pgsql/bin/psql dbstatus
 ```
 
 `pgcheck` 也支持原生 Go driver 后端，适合没有安装 `psql` 的环境：
 
 ```bash
-export PGCHECK_BACKEND=native
+bin/pgcheck --backend native --host 127.0.0.1 --port 5432 --user postgres --password secret dbstatus
+```
+
+常见 psql 展示选项也可以配置：
+
+```bash
+bin/pgcheck --display expanded dbstatus
+bin/pgcheck --display table dbstatus
+bin/pgcheck --tuples-only --no-align connections postgres
+bin/pgcheck --psql-arg --single-transaction relation postgres public
 ```
 
 ## 构建
@@ -270,6 +365,8 @@ pgcheck object <database> <user>             查看用户拥有的对象和角�
 
 ```bash
 bin/pgcheck dbstatus
+bin/pgcheck --config pgcheck.json dbstatus
+bin/pgcheck --backend native --host 127.0.0.1 --user postgres dbstatus
 bin/pgcheck connections postgres
 bin/pgcheck lock postgres
 bin/pgcheck freeze postgres
@@ -288,15 +385,16 @@ bin/pgcheck wal_generate /var/lib/postgresql/data/pg_wal
 │   ├── pgexec/             psql 执行器和服务端版本检测
 │   └── queries/            嵌入式 SQL 加载和轻量模板处理
 ├── SQL/                    原始 SQL 巡检资产
+├── pgcheck.example.json    配置文件示例
 ├── pgcheck.sh              旧版 Bash 实现
 └── README.md
 ```
 
 ## 设计说明
 
-当前 Go 版本刻意保留 `psql` 作为 SQL 执行后端。这样第一阶段重构不需要引入外部驱动依赖，也能完整继承 `.pgpass`、service file、SSL 参数和环境变量等 PostgreSQL 标准连接能力。
+当前 Go 版本保留 `psql` 作为默认 SQL 执行后端。这样可以继承 `.pgpass`、service file、SSL 参数、psql 展示格式和环境变量等 PostgreSQL 标准能力。
 
-项目现在也包含基于 `database/sql` 和 `github.com/lib/pq` 的原生 Go 后端。没有安装 `psql`，或者不希望通过 shell 调用外部命令时，可以使用 `PGCHECK_BACKEND=native`。
+项目现在也包含基于 `database/sql` 和 `github.com/lib/pq` 的原生 Go 后端。没有安装 `psql`，或者不希望通过 shell 调用外部命令时，可以使用 `--backend native`。
 
 ## 开发
 

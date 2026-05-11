@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io/fs"
-	"os"
 	"sort"
 	"strings"
 	"time"
@@ -48,20 +47,26 @@ type invocation struct {
 }
 
 func New(sqlFS fs.FS, build BuildInfo) *App {
+	cfg := pgexec.DefaultConfig()
 	return &App{
 		build:  build,
 		q:      queries.NewStore(sqlFS),
-		runner: pgexec.NewRunner(),
+		runner: pgexec.NewRunner(cfg),
 	}
 }
 
 func (a *App) Run(args []string) error {
 	ctx := context.Background()
-	if len(args) == 0 || isHelp(args[0]) {
+	cfg, rest, help, err := parseGlobalArgs(args)
+	if err != nil {
+		return err
+	}
+	a.runner = pgexec.NewRunner(cfg)
+	if len(rest) == 0 || help || isHelp(rest[0]) {
 		a.printHelp()
 		return nil
 	}
-	if args[0] == "version" || args[0] == "--version" || args[0] == "-v" {
+	if rest[0] == "version" {
 		fmt.Printf("pgcheck %s (%s, %s)\n", a.build.Version, a.build.Commit, a.build.Date)
 		return nil
 	}
@@ -69,13 +74,13 @@ func (a *App) Run(args []string) error {
 		return err
 	}
 
-	cmd, ok := commandMap()[strings.ToLower(args[0])]
+	cmd, ok := commandMap()[strings.ToLower(rest[0])]
 	if !ok {
-		return fmt.Errorf("unknown command %q; run pgcheck help", args[0])
+		return fmt.Errorf("unknown command %q; run pgcheck help", rest[0])
 	}
 
 	inv := invocation{Command: cmd.Name}
-	rest := args[1:]
+	rest = rest[1:]
 	if cmd.Database {
 		if len(rest) == 0 {
 			return fmt.Errorf("%s requires database name\nusage: %s", cmd.Name, cmd.Usage)
@@ -92,7 +97,7 @@ func (a *App) Run(args []string) error {
 
 	versionDB := inv.DB
 	if versionDB == "" {
-		versionDB = os.Getenv("PGDATABASE")
+		versionDB = cfg.Connection.Database
 	}
 	version, err := a.runner.ServerVersion(ctx, versionDB)
 	if err != nil {
@@ -108,10 +113,24 @@ func (a *App) Run(args []string) error {
 func (a *App) printHelp() {
 	fmt.Printf("pgcheck %s - PostgreSQL health check toolkit\n\n", a.build.Version)
 	fmt.Println("Usage:")
-	fmt.Println("  pgcheck <command> [database] [arguments]")
+	fmt.Println("  pgcheck [global options] <command> [database] [arguments]")
 	fmt.Println()
 	fmt.Println("Connection:")
-	fmt.Println("  Uses libpq/psql environment variables such as PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE.")
+	fmt.Println("  Use --config, command-line options, or libpq-compatible environment variables.")
+	fmt.Println()
+	fmt.Println("Global options:")
+	fmt.Println("  --config <path>                              Read JSON config file")
+	fmt.Println("  --backend psql|native                        Select execution backend")
+	fmt.Println("  --psql <path>                                psql executable path")
+	fmt.Println("  --host/--port/--user/--password/--dbname     Connection settings")
+	fmt.Println("  --sslmode <mode>                             PostgreSQL sslmode")
+	fmt.Println("  --display auto|table|expanded                Output display mode")
+	fmt.Println("  --expanded / --table                         Shortcuts for display mode")
+	fmt.Println("  --quiet / --no-quiet                         Toggle psql -q")
+	fmt.Println("  --tuples-only                                Enable psql -t style output")
+	fmt.Println("  --no-align                                   Enable psql -A style output")
+	fmt.Println("  --no-psqlrc                                  Enable psql -X")
+	fmt.Println("  --psql-arg <arg>                             Extra raw psql argument; repeatable")
 	fmt.Println()
 	fmt.Println("Commands:")
 	cmds := commands()
