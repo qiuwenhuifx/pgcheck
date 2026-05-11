@@ -1,6 +1,5 @@
 {
   "_comment": "Example pgcheck config. JSON does not support real comments; keys starting with _comment are ignored by pgcheck.",
-  "backend": "psql",
   "connection": {
     "_comment": "Connection settings. These are equivalent to PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE and PGSSLMODE.",
     "host": "127.0.0.1",

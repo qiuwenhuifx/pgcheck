@@ -10,7 +10,6 @@ import (
 )
 
 type Config struct {
-	Backend    string           `json:"backend"`
 	Connection ConnectionConfig `json:"connection"`
 	PSQL       PSQLConfig       `json:"psql"`
 	Output     OutputConfig     `json:"output"`
@@ -40,7 +39,6 @@ type OutputConfig struct {
 
 func DefaultConfig() Config {
 	return Config{
-		Backend: envDefault("PGCHECK_BACKEND", "psql"),
 		Connection: ConnectionConfig{
 			Host:     envDefault("PGHOST", "localhost"),
 			Port:     envDefault("PGPORT", "5432"),
@@ -96,10 +94,6 @@ func DefaultConfigPath() string {
 }
 
 func (c *Config) Normalize() {
-	c.Backend = strings.ToLower(strings.TrimSpace(c.Backend))
-	if c.Backend == "" {
-		c.Backend = "psql"
-	}
 	c.Output.Expanded = strings.ToLower(strings.TrimSpace(c.Output.Expanded))
 	if c.Output.Expanded == "" {
 		c.Output.Expanded = "auto"
@@ -119,11 +113,6 @@ func (c *Config) Normalize() {
 }
 
 func (c Config) Validate() error {
-	switch c.Backend {
-	case "psql", "native":
-	default:
-		return fmt.Errorf("unsupported backend %q", c.Backend)
-	}
 	switch c.Output.Expanded {
 	case "auto", "table", "expanded":
 	default:

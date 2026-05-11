@@ -16,9 +16,10 @@ import (
 )
 
 type Runner struct {
-	Config Config
-	Out    io.Writer
-	Err    io.Writer
+	Config  Config
+	Backend string
+	Out     io.Writer
+	Err     io.Writer
 }
 
 type Options struct {
@@ -36,25 +37,26 @@ type ServerVersion struct {
 
 func NewRunner(cfg Config) *Runner {
 	cfg.Normalize()
+	backend := "native"
+	if _, err := exec.LookPath(cfg.PSQL.Path); err == nil {
+		backend = "psql"
+	}
 	return &Runner{
-		Config: cfg,
-		Out:    os.Stdout,
-		Err:    os.Stderr,
+		Config:  cfg,
+		Backend: backend,
+		Out:     os.Stdout,
+		Err:     os.Stderr,
 	}
 }
 
 func (r *Runner) Check(ctx context.Context) error {
-	if r.Config.Backend == "native" {
+	if r.Backend == "native" {
 		db, err := sql.Open("postgres", r.connString(""))
 		if err != nil {
 			return err
 		}
 		defer db.Close()
 		return db.PingContext(ctx)
-	}
-	_, err := exec.LookPath(r.Config.PSQL.Path)
-	if err != nil {
-		return fmt.Errorf("cannot find %q in PATH; please install PostgreSQL client tools, set psql.path, or use --backend native", r.Config.PSQL.Path)
 	}
 	cmd := exec.CommandContext(ctx, r.Config.PSQL.Path, "--version")
 	var stderr bytes.Buffer
@@ -83,7 +85,7 @@ func (r *Runner) ServerVersion(ctx context.Context, database string) (ServerVers
 }
 
 func (r *Runner) QueryScalar(ctx context.Context, opts Options, query string) (string, error) {
-	if r.Config.Backend == "native" {
+	if r.Backend == "native" {
 		db, err := sql.Open("postgres", r.connString(opts.Database))
 		if err != nil {
 			return "", err
@@ -106,7 +108,7 @@ func (r *Runner) QueryScalar(ctx context.Context, opts Options, query string) (s
 }
 
 func (r *Runner) Exec(ctx context.Context, opts Options, query string) error {
-	if r.Config.Backend == "native" {
+	if r.Backend == "native" {
 		db, err := sql.Open("postgres", r.connString(opts.Database))
 		if err != nil {
 			return err
