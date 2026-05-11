@@ -41,8 +41,10 @@ Config shape:
 
 ```json
 {
+  "_comment": "Keys starting with _comment are documentation only and ignored by pgcheck.",
   "backend": "psql",
   "connection": {
+    "_comment": "Equivalent to PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE and PGSSLMODE.",
     "host": "127.0.0.1",
     "port": "5432",
     "user": "postgres",
@@ -51,14 +53,21 @@ Config shape:
     "sslmode": "disable"
   },
   "psql": {
+    "_comment": "These options mirror psql command-line flags and mainly affect the psql backend.",
     "path": "psql",
+    "_quiet": "quiet=true is the same as psql -q: reduce non-data messages.",
     "quiet": true,
+    "_tuples_only": "tuples_only=true is the same as psql -t: show rows without headers/footers.",
     "tuples_only": false,
+    "_no_align": "no_align=true is the same as psql -A: use unaligned output.",
     "no_align": false,
+    "_no_psqlrc": "no_psqlrc=true is the same as psql -X: ignore ~/.psqlrc for stable output.",
     "no_psqlrc": true,
+    "_extra_args": "extra_args are appended directly to psql, for example [\"--csv\"] or [\"--set\", \"ON_ERROR_STOP=1\"].",
     "extra_args": []
   },
   "output": {
+    "_expanded": "auto keeps command defaults; table forces normal table output; expanded forces psql -x style output.",
     "expanded": "auto"
   }
 }
@@ -93,6 +102,16 @@ bin/pgcheck --display table dbstatus
 bin/pgcheck --tuples-only --no-align connections postgres
 bin/pgcheck --psql-arg --single-transaction relation postgres public
 ```
+
+Option notes for users familiar with `psql`:
+
+| Config key | CLI option | psql flag | Meaning |
+| --- | --- | --- | --- |
+| `quiet` | `--quiet` / `--no-quiet` | `-q` | Reduce non-data messages printed by `psql`. |
+| `tuples_only` | `--tuples-only` | `-t` | Print rows without column headers and footers. |
+| `no_align` | `--no-align` | `-A` | Use unaligned output instead of padded table output. |
+| `no_psqlrc` | `--no-psqlrc` | `-X` | Do not read `~/.psqlrc`, making output more predictable. |
+| `extra_args` | `--psql-arg` | passthrough | Append raw arguments to `psql`, such as `--csv` or `--set name=value`. |
 
 ## Build
 
@@ -255,8 +274,10 @@ bin/pgcheck --config pgcheck.json --display expanded dbstatus
 
 ```json
 {
+  "_comment": "以 _comment 开头的字段仅用于说明，pgcheck 会忽略它们。",
   "backend": "psql",
   "connection": {
+    "_comment": "等价于 PGHOST、PGPORT、PGUSER、PGPASSWORD、PGDATABASE 和 PGSSLMODE。",
     "host": "127.0.0.1",
     "port": "5432",
     "user": "postgres",
@@ -265,14 +286,21 @@ bin/pgcheck --config pgcheck.json --display expanded dbstatus
     "sslmode": "disable"
   },
   "psql": {
+    "_comment": "这些选项和 psql 命令行参数保持一致，主要影响 psql 后端。",
     "path": "psql",
+    "_quiet": "quiet=true 等价于 psql -q：减少非数据类输出。",
     "quiet": true,
+    "_tuples_only": "tuples_only=true 等价于 psql -t：只输出行数据，不输出表头和页脚。",
     "tuples_only": false,
+    "_no_align": "no_align=true 等价于 psql -A：使用非对齐输出。",
     "no_align": false,
+    "_no_psqlrc": "no_psqlrc=true 等价于 psql -X：不读取 ~/.psqlrc，让输出更稳定。",
     "no_psqlrc": true,
+    "_extra_args": "extra_args 会直接透传给 psql，例如 [\"--csv\"] 或 [\"--set\", \"ON_ERROR_STOP=1\"]。",
     "extra_args": []
   },
   "output": {
+    "_expanded": "auto 保留命令默认展示；table 强制普通表格；expanded 强制 psql -x 风格展示。",
     "expanded": "auto"
   }
 }
@@ -307,6 +335,16 @@ bin/pgcheck --display table dbstatus
 bin/pgcheck --tuples-only --no-align connections postgres
 bin/pgcheck --psql-arg --single-transaction relation postgres public
 ```
+
+给熟悉 `psql` 的用户看的对应关系：
+
+| 配置项 | CLI 参数 | psql 参数 | 含义 |
+| --- | --- | --- | --- |
+| `quiet` | `--quiet` / `--no-quiet` | `-q` | 减少 `psql` 的非数据类输出。 |
+| `tuples_only` | `--tuples-only` | `-t` | 只输出行数据，不输出列名和页脚。 |
+| `no_align` | `--no-align` | `-A` | 使用非对齐输出，而不是补齐宽度的表格输出。 |
+| `no_psqlrc` | `--no-psqlrc` | `-X` | 不读取 `~/.psqlrc`，避免本地 psql 配置影响巡检输出。 |
+| `extra_args` | `--psql-arg` | 透传 | 直接追加原始 psql 参数，例如 `--csv` 或 `--set name=value`。 |
 
 ## 构建
 

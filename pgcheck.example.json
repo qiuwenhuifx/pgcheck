@@ -1,6 +1,8 @@
 {
+  "_comment": "Example pgcheck config. JSON does not support real comments; keys starting with _comment are ignored by pgcheck.",
   "backend": "psql",
   "connection": {
+    "_comment": "Connection settings. These are equivalent to PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE and PGSSLMODE.",
     "host": "127.0.0.1",
     "port": "5432",
     "user": "postgres",
@@ -9,14 +11,21 @@
     "sslmode": "disable"
   },
   "psql": {
+    "_comment": "These options mirror psql command-line flags. They only affect the psql backend; the native backend applies compatible display behavior where possible.",
     "path": "psql",
+    "_quiet": "quiet=true passes -q to psql, reducing non-data messages.",
     "quiet": true,
+    "_tuples_only": "tuples_only=true passes -t to psql, showing rows without headers/footers.",
     "tuples_only": false,
+    "_no_align": "no_align=true passes -A to psql, using unaligned output.",
     "no_align": false,
+    "_no_psqlrc": "no_psqlrc=true passes -X to psql, preventing ~/.psqlrc from changing output.",
     "no_psqlrc": true,
+    "_extra_args": "extra_args are appended directly to psql, for advanced options such as --csv or --set name=value.",
     "extra_args": []
   },
   "output": {
+    "_expanded": "expanded controls pgcheck display: auto keeps command defaults, table forces table view, expanded forces psql -x style output.",
     "expanded": "auto"
   }
 }
