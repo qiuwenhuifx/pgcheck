@@ -2,7 +2,7 @@
 
 English | [中文](#中文)
 
-`pgcheck` is a lightweight PostgreSQL health-check CLI for DBAs, SREs, and database engineers. It collects operational signals from PostgreSQL system catalogs and statistics views, including locks, wait events, replication, vacuum, transaction ID age, relation bloat, index health, WAL archiving, partitions, TOAST tables, and object ownership.
+`pgcheck` is a lightweight PostgreSQL health-check CLI for DBAs, SREs, and database engineers. It collects operational signals from PostgreSQL system catalogs and statistics views, including locks, wait events, replication, replication slots, xmin horizon, vacuum, transaction ID age, relation bloat, index health, temporary files, WAL archiving, partitions, TOAST tables, and object ownership.
 
 The project started as a Bash-based one-click inspection script. It is now being refactored into a structured Go project with embedded SQL assets, explicit command registration, server-version detection, and a cleaner compatibility model.
 
@@ -126,26 +126,39 @@ pgcheck relation <database> <schema>         List table and index size in a sche
 pgcheck relconstraint <database> <relation>  List constraints and multi-column indexes for a relation
 pgcheck alltoast <database> <schema>         List TOAST tables in a schema
 pgcheck reltoast <database> <relation>       Show TOAST-related columns for a relation
+pgcheck analyze_needed <database>            Show tables that need ANALYZE
 pgcheck dbstatus                             Show database-level statistics
 pgcheck index_bloat <database>               Estimate btree index bloat
 pgcheck index_duplicate <database>           Find duplicate indexes
-pgcheck index_low <database>                 Find low-efficiency indexes
-pgcheck index_state <database>               Show index details and invalid indexes
+pgcheck index_efficiency <database>          Find low-efficiency indexes
+pgcheck index_null_risk <database>           Find large single-column indexes on high-null columns
+pgcheck index_health <database>              Show index details and invalid indexes
+pgcheck integer_pk_risk <database>           Show int2/int4 primary key capacity risk
+pgcheck io                                   Show pg_stat_io distribution by backend and object
+pgcheck io_hotspot                           Show pg_stat_io hotspots by time and operations
+pgcheck unused_indexes <database>            Find unused and rarely used indexes
 pgcheck lock <database>                      Show lock waits and blocking queue
 pgcheck checkpoint                           Show background writer and checkpointer statistics
 pgcheck freeze <database>                    Show transaction ID consumption and freeze risk
 pgcheck replication                          Show physical streaming replication status
+pgcheck replication_slots                    Show replication slot xmin and retained WAL
 pgcheck connections <database>               Show connection summary and active queries
 pgcheck long_transaction <database>          Show long-running transactions
-pgcheck relation_bloat <database>            Estimate table bloat and vacuum blockers
+pgcheck privilege                            Show current monitoring privileges
+pgcheck table_bloat <database>               Estimate table bloat and vacuum blockers
+pgcheck temp_files                           Show active sessions using temporary files
 pgcheck vacuum_state <database>              Show running VACUUM progress
-pgcheck vacuum_need <database>               Show tables likely to need vacuum
+pgcheck vacuum_needed <database>             Show tables likely to need vacuum
+pgcheck vacuum_queue <database>              Show vacuum queue and running vacuum details
 pgcheck index_create <database>              Show CREATE INDEX progress
 pgcheck wal_archive                          Show WAL archiver statistics
 pgcheck wal_generate <wal_path>              Show WAL generation speed by scanning pg_wal
+pgcheck wal_health                           Show WAL retention and archiving health
 pgcheck wait_event <database>                Show wait events and wait event types
 pgcheck partition <database>                 Show partition information
 pgcheck object <database> <user>             Show objects owned by a user and role membership
+pgcheck wraparound_risk <database>           Show XID and MultiXID wraparound risk
+pgcheck xmin_blockers                        Show global xmin horizon blockers
 ```
 
 ## Examples
@@ -158,8 +171,21 @@ bin/pgcheck lock postgres
 bin/pgcheck freeze postgres
 bin/pgcheck relation postgres public
 bin/pgcheck index_bloat postgres
+bin/pgcheck xmin_blockers
+bin/pgcheck wraparound_risk postgres
+bin/pgcheck wal_health
+bin/pgcheck analyze_needed postgres
+bin/pgcheck integer_pk_risk postgres
+bin/pgcheck replication_slots
+bin/pgcheck vacuum_queue postgres
+bin/pgcheck io
+bin/pgcheck temp_files
+bin/pgcheck table_bloat postgres --show-sql
+bin/pgcheck wraparound_risk postgres --explain
 bin/pgcheck wal_generate /var/lib/postgresql/data/pg_wal
 ```
+
+Legacy command names such as `vacuum_need`, `analyze_need`, `index_low`, `index_null_frac`, `index_state`, `int_pk_risk`, `relation_bloat`, `xid_wraparound`, and `xmin_horizon` remain available as compatibility aliases.
 
 ## Project Layout
 
@@ -179,6 +205,8 @@ bin/pgcheck wal_generate /var/lib/postgresql/data/pg_wal
 ## Design Notes
 
 `pgcheck` uses `psql` automatically when it is available. This preserves standard PostgreSQL behavior, including `.pgpass`, service files, SSL options, psql formatting, and existing environment variables. If `psql` is not found, `pgcheck` falls back to its native Go backend based on `database/sql` and `github.com/lib/pq`.
+
+Several checks are inspired by practical recipes from [postgres-howto in Chinese](https://postgres-howto.cn/#/README), especially [replication lag](https://postgres-howto.cn/#/./docs/17), [pg_wal growth](https://postgres-howto.cn/#/./docs/31), [wraparound risk](https://postgres-howto.cn/#/./docs/44), [xmin horizon](https://postgres-howto.cn/#/./docs/45), [autovacuum queue and progress](https://postgres-howto.cn/#/./docs/67), [unused indexes](https://postgres-howto.cn/#/./docs/75), [int4 PK capacity](https://postgres-howto.cn/#/./docs/80), and [ANALYZE/statistics](https://postgres-howto.cn/#/./docs/94). The SQL is kept as plain files under `SQL/` so it can be reviewed and improved independently.
 
 ## Development
 
@@ -214,7 +242,7 @@ Apache License 2.0. See [LICENSE](LICENSE).
 
 ## 中文
 
-`pgcheck` 是一款轻量级 PostgreSQL 巡检 CLI，面向 DBA、SRE 和数据库工程师。它通过 PostgreSQL 系统表、系统视图和统计视图采集运行状态，覆盖锁等待、等待事件、复制、VACUUM、事务 ID 年龄、表膨胀、索引健康、WAL 归档、分区表、TOAST 表和对象归属等常见运维场景。
+`pgcheck` 是一款轻量级 PostgreSQL 巡检 CLI，面向 DBA、SRE 和数据库工程师。它通过 PostgreSQL 系统表、系统视图和统计视图采集运行状态，覆盖锁等待、等待事件、复制、复制槽、xmin horizon、VACUUM、事务 ID 年龄、表膨胀、索引健康、临时文件、WAL 归档、分区表、TOAST 表和对象归属等常见运维场景。
 
 这个项目最早是一个 Bash 编写的一键巡检脚本。当前版本正在重构为结构化的 Go 项目：SQL 资源会被嵌入二进制，命令通过注册表管理，版本判断基于 PostgreSQL 服务端版本，并提供更清晰的兼容策略。
 
@@ -338,26 +366,39 @@ pgcheck relation <database> <schema>         查看指定 schema 下表和索引
 pgcheck relconstraint <database> <relation>  查看指定表的约束和多列索引
 pgcheck alltoast <database> <schema>         查看指定 schema 下的 TOAST 表
 pgcheck reltoast <database> <relation>       查看指定表的 TOAST 相关列和 TOAST 表信息
+pgcheck analyze_needed <database>            查看需要 ANALYZE 的表
 pgcheck dbstatus                             查看数据库整体状态
 pgcheck index_bloat <database>               估算 btree 索引膨胀
 pgcheck index_duplicate <database>           查找重复索引
-pgcheck index_low <database>                 查找低效索引
-pgcheck index_state <database>               查看索引详情和异常索引
+pgcheck index_efficiency <database>          查找低效索引
+pgcheck index_null_risk <database>           查找高 NULL 比例列上的大索引
+pgcheck index_health <database>              查看索引详情和异常索引
+pgcheck integer_pk_risk <database>           查看 int2/int4 主键容量风险
+pgcheck io                                   查看 pg_stat_io 按 backend/object 的 I/O 分布
+pgcheck io_hotspot                           查看 pg_stat_io I/O 热点
+pgcheck unused_indexes <database>            查找未使用和低频使用索引
 pgcheck lock <database>                      查看锁等待和阻塞队列
 pgcheck checkpoint                           查看后台写进程和检查点统计
 pgcheck freeze <database>                    查看事务 ID 消耗和 freeze 风险
 pgcheck replication                          查看物理流复制状态
+pgcheck replication_slots                    查看复制槽 xmin 和 WAL 保留
 pgcheck connections <database>               查看连接汇总和当前查询
 pgcheck long_transaction <database>          查看长事务
-pgcheck relation_bloat <database>            估算表膨胀并查看 VACUUM 阻塞信息
+pgcheck privilege                            查看当前监控权限
+pgcheck table_bloat <database>               估算表膨胀并查看 VACUUM 阻塞信息
+pgcheck temp_files                           查看正在使用临时文件的会话
 pgcheck vacuum_state <database>              查看正在运行的 VACUUM 进度
-pgcheck vacuum_need <database>               查看可能需要 VACUUM 的表
+pgcheck vacuum_needed <database>             查看可能需要 VACUUM 的表
+pgcheck vacuum_queue <database>              查看 VACUUM 队列和执行状态
 pgcheck index_create <database>              查看 CREATE INDEX 进度
 pgcheck wal_archive                          查看 WAL 归档状态
 pgcheck wal_generate <wal_path>              基于 pg_wal 目录估算 WAL 生成速度
+pgcheck wal_health                           查看 WAL 保留和归档健康状态
 pgcheck wait_event <database>                查看等待事件和等待类型
 pgcheck partition <database>                 查看分区表信息
 pgcheck object <database> <user>             查看用户拥有的对象和角色成员关系
+pgcheck wraparound_risk <database>           查看 XID 和 MultiXID 回卷风险
+pgcheck xmin_blockers                        查看全局 xmin horizon 阻塞来源
 ```
 
 ## 示例
@@ -370,8 +411,21 @@ bin/pgcheck lock postgres
 bin/pgcheck freeze postgres
 bin/pgcheck relation postgres public
 bin/pgcheck index_bloat postgres
+bin/pgcheck xmin_blockers
+bin/pgcheck wraparound_risk postgres
+bin/pgcheck wal_health
+bin/pgcheck analyze_needed postgres
+bin/pgcheck integer_pk_risk postgres
+bin/pgcheck replication_slots
+bin/pgcheck vacuum_queue postgres
+bin/pgcheck io
+bin/pgcheck temp_files
+bin/pgcheck table_bloat postgres --show-sql
+bin/pgcheck wraparound_risk postgres --explain
 bin/pgcheck wal_generate /var/lib/postgresql/data/pg_wal
 ```
+
+旧命令名仍保留为兼容别名，例如 `vacuum_need`、`analyze_need`、`index_low`、`index_null_frac`、`index_state`、`int_pk_risk`、`relation_bloat`、`xid_wraparound` 和 `xmin_horizon`。
 
 ## 项目结构
 
@@ -391,6 +445,8 @@ bin/pgcheck wal_generate /var/lib/postgresql/data/pg_wal
 ## 设计说明
 
 `pgcheck` 会在可用时自动使用 `psql`，这样可以继承 `.pgpass`、service file、SSL 参数、psql 展示格式和环境变量等 PostgreSQL 标准能力。如果找不到 `psql`，则自动回退到基于 `database/sql` 和 `github.com/lib/pq` 的原生 Go 后端。
+
+部分巡检项来自 [postgres-howto in Chinese](https://postgres-howto.cn/#/README) 中的实践思路，尤其是 [replication lag](https://postgres-howto.cn/#/./docs/17)、[pg_wal growth](https://postgres-howto.cn/#/./docs/31)、[wraparound risk](https://postgres-howto.cn/#/./docs/44)、[xmin horizon](https://postgres-howto.cn/#/./docs/45)、[autovacuum queue and progress](https://postgres-howto.cn/#/./docs/67)、[unused indexes](https://postgres-howto.cn/#/./docs/75)、[int4 PK capacity](https://postgres-howto.cn/#/./docs/80) 和 [ANALYZE/statistics](https://postgres-howto.cn/#/./docs/94)。这些 SQL 都保留为 `SQL/` 目录下的普通文件，方便审阅和继续演进。
 
 ## 开发
 

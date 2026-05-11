@@ -13,8 +13,8 @@ var sqlFS embed.FS
 
 var (
 	version = "2.0.0"
-	commit  = "dev"
-	date    = "unknown"
+	commit  = ""
+	date    = ""
 )
 
 func main() {

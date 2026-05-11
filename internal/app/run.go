@@ -49,6 +49,11 @@ func sqlCommand(name, usage, summary string, database bool, extra []argSpec, min
 	}
 }
 
+func withExplain(target command, explain string) command {
+	target.Explain = explain
+	return target
+}
+
 func (a *App) runStep(ctx context.Context, inv invocation, step queryStep) error {
 	query, err := a.stepSQL(step)
 	if err != nil {
@@ -62,6 +67,10 @@ func (a *App) runStep(ctx context.Context, inv invocation, step queryStep) error
 	}
 	if step.Header != "" {
 		fmt.Println(step.Header)
+	}
+	if inv.ShowSQL {
+		printSQLTrace([]string{query})
+		return nil
 	}
 	opts := pgexec.Options{Database: inv.DB, Expanded: a.displayExpanded(step.Expanded)}
 	repeat := step.Repeat
@@ -125,11 +134,40 @@ func runReplication(ctx context.Context, a *App, inv invocation) error {
 	if err != nil {
 		return err
 	}
+	if inv.ShowSQL {
+		printSQLTrace([]string{query})
+		return nil
+	}
 	return a.runner.Exec(ctx, pgexec.Options{Expanded: a.displayExpanded(false)}, query)
+}
+
+func runReplicationSlots(ctx context.Context, a *App, inv invocation) error {
+	file := "replication_slots_10.sql"
+	if inv.Version.Major >= 15 {
+		file = "replication_slots.sql"
+	}
+	query, err := a.q.Read(file)
+	if err != nil {
+		return err
+	}
+	if inv.ShowSQL {
+		printSQLTrace([]string{query})
+		printNotes(replicationSlotsNotes)
+		return nil
+	}
+	if err := a.runner.Exec(ctx, pgexec.Options{Expanded: a.displayExpanded(false)}, query); err != nil {
+		return err
+	}
+	printNotes(replicationSlotsNotes)
+	return nil
 }
 
 func runDBStatus(ctx context.Context, a *App, inv invocation) error {
 	query := databaseStatusSQL(inv.Version.Major)
+	if inv.ShowSQL {
+		printSQLTrace([]string{query})
+		return nil
+	}
 	return a.runner.Exec(ctx, pgexec.Options{Expanded: a.displayExpanded(true)}, query)
 }
 
@@ -141,6 +179,11 @@ func runCheckpoint(ctx context.Context, a *App, inv invocation) error {
 	query, err := a.q.Read(file)
 	if err != nil {
 		return err
+	}
+	if inv.ShowSQL {
+		printSQLTrace([]string{query})
+		printNotes(checkpointNotes)
+		return nil
 	}
 	if err := a.runner.Exec(ctx, pgexec.Options{Expanded: a.displayExpanded(true)}, query); err != nil {
 		return err

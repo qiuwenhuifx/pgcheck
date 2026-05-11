@@ -122,10 +122,14 @@ func (r *Runner) Exec(ctx context.Context, opts Options, query string) error {
 		return printRows(r.Out, rows, r.effectiveOptions(opts))
 	}
 	cmd := r.command(ctx, opts, query)
+	var stderr bytes.Buffer
 	cmd.Stdout = r.Out
-	cmd.Stderr = r.Err
+	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
-		return formatCommandError(err, "")
+		return formatCommandError(err, stderr.String())
+	}
+	if stderr.Len() > 0 {
+		_, _ = r.Err.Write(stderr.Bytes())
 	}
 	return nil
 }

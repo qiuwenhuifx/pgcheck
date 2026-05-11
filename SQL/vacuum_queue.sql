@@ -42,7 +42,7 @@ select
     'vt: %s, vsf: %s, %s', -- 'vt' – vacuum_threshold, 'vsf' - vacuum_scale_factor
     vacuum_settings.autovacuum_vacuum_threshold,
     vacuum_settings.autovacuum_vacuum_scale_factor,
-    (case when autovacuum_enabled then 'DISABLED' else 'enabled' end)
+    (case when autovacuum_enabled then 'enabled' else 'DISABLED' end)
   ) as effective_settings,
   case
     when last_autovacuum > coalesce(last_vacuum, '0001-01-01') then left(last_autovacuum::text, 19) || ' (auto)'

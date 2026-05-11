@@ -1,0 +1,25 @@
+SELECT
+    backend_type,
+    object,
+    context,
+    reads,
+    read_time,
+    writes,
+    write_time,
+    writebacks,
+    writeback_time,
+    extends,
+    extend_time,
+    op_bytes,
+    hits,
+    evictions,
+    reuses,
+    fsyncs,
+    fsync_time,
+    stats_reset
+FROM
+    pg_stat_io
+ORDER BY
+    backend_type,
+    object,
+    context;

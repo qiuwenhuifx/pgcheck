@@ -43,3 +43,38 @@ func TestCommandRegistryHasUniqueNames(t *testing.T) {
 		seen[cmd.Name] = true
 	}
 }
+
+func TestCommandAliases(t *testing.T) {
+	aliases := map[string]string{
+		"analyze_need":    "analyze_needed",
+		"index_low":       "index_efficiency",
+		"index_null_frac": "index_null_risk",
+		"index_state":     "index_health",
+		"int_pk_risk":     "integer_pk_risk",
+		"sequence_risk":   "integer_pk_risk",
+		"relation_bloat":  "table_bloat",
+		"vacuum_need":     "vacuum_needed",
+		"xid_wraparound":  "wraparound_risk",
+		"xmin_horizon":    "xmin_blockers",
+	}
+	registry := commandMap()
+	for alias, target := range aliases {
+		cmd, ok := registry[alias]
+		if !ok {
+			t.Fatalf("alias %q is missing", alias)
+		}
+		if cmd.Name != target {
+			t.Fatalf("alias %q resolved to %q, want %q", alias, cmd.Name, target)
+		}
+	}
+}
+
+func TestSplitTailFlags(t *testing.T) {
+	positional, flags := splitTailFlags([]string{"postgres", "--show-sql", "public", "--explain"})
+	if strings.Join(positional, ",") != "postgres,public" {
+		t.Fatalf("positional = %v", positional)
+	}
+	if strings.Join(flags, ",") != "--show-sql,--explain" {
+		t.Fatalf("flags = %v", flags)
+	}
+}
