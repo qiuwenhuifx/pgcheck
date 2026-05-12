@@ -12,8 +12,8 @@ SELECT
     datname,
     xid_age,
     mxid_age,
-    round(100 * xid_age / 2000000000::numeric, 2) AS xid_used_pct,
-    round(100 * mxid_age / 2000000000::numeric, 2) AS mxid_used_pct,
+    round(100::numeric * xid_age::numeric / 2000000000::numeric, 2) AS xid_used_pct,
+    round(100::numeric * mxid_age::numeric / 2000000000::numeric, 2) AS mxid_used_pct,
     pg_size_pretty(db_size) AS db_size
 FROM
     data
