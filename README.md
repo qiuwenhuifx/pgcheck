@@ -143,6 +143,7 @@ pgcheck io                                   Show pg_stat_io distribution by bac
 pgcheck io_hotspot                           Show pg_stat_io hotspots by time and operations
 pgcheck unused_indexes <database>            Find unused and rarely used indexes
 pgcheck lock <database>                      Show lock waits and blocking queue
+pgcheck lock_tree <database>                 Show recursive blocking trees and root blockers
 pgcheck checkpoint                           Show background writer and checkpointer statistics
 pgcheck freeze <database>                    Show transaction ID consumption and freeze risk
 pgcheck replication                          Show physical streaming replication status
@@ -175,6 +176,7 @@ bin/pgcheck -At dbstatus
 bin/pgcheck --config pgcheck.json dbstatus
 bin/pgcheck connections postgres
 bin/pgcheck lock postgres
+bin/pgcheck lock_tree postgres
 bin/pgcheck freeze postgres
 bin/pgcheck relation postgres public
 bin/pgcheck index_bloat postgres
@@ -390,6 +392,7 @@ pgcheck io                                   查看 pg_stat_io 按 backend/objec
 pgcheck io_hotspot                           查看 pg_stat_io I/O 热点
 pgcheck unused_indexes <database>            查找未使用和低频使用索引
 pgcheck lock <database>                      查看锁等待和阻塞队列
+pgcheck lock_tree <database>                 查看递归阻塞树和根阻塞会话
 pgcheck checkpoint                           查看后台写进程和检查点统计
 pgcheck freeze <database>                    查看事务 ID 消耗和 freeze 风险
 pgcheck replication                          查看物理流复制状态
@@ -422,6 +425,7 @@ bin/pgcheck -At dbstatus
 bin/pgcheck --config pgcheck.json dbstatus
 bin/pgcheck connections postgres
 bin/pgcheck lock postgres
+bin/pgcheck lock_tree postgres
 bin/pgcheck freeze postgres
 bin/pgcheck relation postgres public
 bin/pgcheck index_bloat postgres

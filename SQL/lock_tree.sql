@@ -3,7 +3,7 @@ with recursive activity as (
     pg_blocking_pids(pid) blocked_by,
     *,
     age(clock_timestamp(), xact_start)::interval(0) as tx_age,
-    age(clock_timestamp(), state_change)::interval(0) as state_age
+    age(clock_timestamp(), state_change)::interval(0) as wait_age
   from pg_stat_activity
   where state is distinct from 'idle'
 ), blockers as (
@@ -40,18 +40,23 @@ with recursive activity as (
 select
   pid,
   blocked_by,
+  case
+    when wait_event_type = 'Lock' then 'waiting'
+    else replace(state, 'idle in transaction', 'idletx')
+  end as state,
+  format('%s:%s', wait_event_type, wait_event) as wait,
+  wait_age,
   tx_age,
-  state_age,
-  replace(state, 'idle in transaction', 'idletx') state,
+  to_char(age(backend_xid), 'FM999,999,999,990') as xid_age,
+  to_char(2147483647 - age(backend_xmin), 'FM999,999,999,990') as xmin_ttf,
   datname,
   usename,
-  format('%s:%s', wait_event_type, wait_event) as wait,
   (select count(distinct t1.pid) from tree t1 where array[tree.pid] <@ t1.path and t1.pid <> tree.pid) as blkd,
   format(
     '%s %s%s',
-    lpad('[' || pid::text || ']', 7, ' '),
+    lpad('[' || pid::text || ']', 9, ' '),
     repeat('.', level - 1) || case when level > 1 then ' ' end,
-    query
-  )
+    left(query, 1000)
+  ) as query
 from tree
 order by top_blocker_pid, level, pid;

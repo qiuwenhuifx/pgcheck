@@ -61,6 +61,11 @@ var lockNotes = []string{
 	"Pay attention to out of shared memory errors when lock usage is high.",
 }
 
+var lockTreeNotes = []string{
+	"Root blockers are the top rows in each tree; rows with dotted prefixes are blocked below them.",
+	"pg_blocking_pids() briefly accesses lock manager shared state, so use this as an ad hoc troubleshooting command instead of high-frequency monitoring.",
+}
+
 var privilegeNotes = []string{
 	"pg_monitor is the recommended role for broad monitoring visibility.",
 	"Grant pg_read_all_stats or pg_read_all_settings when a narrower privilege is enough.",
