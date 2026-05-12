@@ -83,7 +83,12 @@ export PGPASSWORD=secret
 
 If `psql` is not in `PATH`, set `psql.path` in the config file. When `psql` cannot be found, `pgcheck` automatically uses the native Go driver:
 
-Common psql-style display options are configured in `pgcheck.json`, not passed as command-line flags.
+Common psql-style display defaults are configured in `pgcheck.json`. For one-off runs, `pgcheck` also supports `-x`, `-A`, and `-t` before the command, with the same meaning as `psql`:
+
+```bash
+bin/pgcheck -x lock postgres
+bin/pgcheck -At dbstatus
+```
 
 Option notes for users familiar with `psql`:
 
@@ -165,6 +170,8 @@ pgcheck xmin_blockers                        Show global xmin horizon blockers
 
 ```bash
 bin/pgcheck dbstatus
+bin/pgcheck -x lock postgres
+bin/pgcheck -At dbstatus
 bin/pgcheck --config pgcheck.json dbstatus
 bin/pgcheck connections postgres
 bin/pgcheck lock postgres
@@ -323,7 +330,12 @@ export PGPASSWORD=secret
 
 如果 `psql` 不在 `PATH` 中，可以在配置文件里设置 `psql.path`。如果仍然找不到 `psql`，`pgcheck` 会自动使用原生 Go driver。
 
-常见 psql 展示选项统一在 `pgcheck.json` 中配置，不再通过命令行参数临时指定。
+常见 psql 展示选项默认值可以在 `pgcheck.json` 中配置。如果只是临时执行一次，也可以在命令前使用 `-x`、`-A`、`-t`，含义和 `psql` 一致：
+
+```bash
+bin/pgcheck -x lock postgres
+bin/pgcheck -At dbstatus
+```
 
 给熟悉 `psql` 的用户看的对应关系：
 
@@ -405,6 +417,8 @@ pgcheck xmin_blockers                        查看全局 xmin horizon 阻塞来
 
 ```bash
 bin/pgcheck dbstatus
+bin/pgcheck -x lock postgres
+bin/pgcheck -At dbstatus
 bin/pgcheck --config pgcheck.json dbstatus
 bin/pgcheck connections postgres
 bin/pgcheck lock postgres

@@ -59,3 +59,40 @@ func TestParseGlobalArgsRejectsUnknownOptions(t *testing.T) {
 		t.Fatalf("expected unknown option error")
 	}
 }
+
+func TestParseGlobalArgsOutputFlagOverrides(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "pgcheck.json")
+	data := []byte(`{
+  "psql": {
+    "tuples_only": false,
+    "no_align": false
+  },
+  "output": {
+    "expanded": "table"
+  }
+}`)
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, rest, help, err := parseGlobalArgs([]string{"--config", path, "-x", "-At", "dbstatus"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if help {
+		t.Fatalf("did not expect help")
+	}
+	if len(rest) != 1 || rest[0] != "dbstatus" {
+		t.Fatalf("unexpected remaining args: %v", rest)
+	}
+	if cfg.Output.Expanded != "expanded" {
+		t.Fatalf("expanded = %q", cfg.Output.Expanded)
+	}
+	if !cfg.PSQL.NoAlign {
+		t.Fatalf("no_align should be true")
+	}
+	if !cfg.PSQL.TuplesOnly {
+		t.Fatalf("tuples_only should be true")
+	}
+}
